@@ -47,7 +47,7 @@ public class SearchTest extends Base{
 		
 		String actualSearchMessage = driver.findElement(By.xpath("//div[@id='content']/h2/following-sibling::p")).getText();
 		Assert.assertEquals(actualSearchMessage, "abcd","No product message in search results is not displayed");
-		//Removed the commented lines
+		//Assertion commented lines are Removed to clean commented code.
 		
 	}
 	
