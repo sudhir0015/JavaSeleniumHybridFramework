@@ -1,0 +1,72 @@
+name: CI - Java Selenium Tests
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Set up Java and enable Maven dependency caching
+      - name: Set up Temurin JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      # Install Google Chrome (stable)
+      - name: Set up Chrome
+        uses: browser-actions/setup-chrome@v1
+
+      # OPTIONAL: If your framework still needs an explicit ChromeDriver.
+      # If you're on Selenium 4.6+ you can remove this step (Selenium Manager handles drivers).
+      - name: Set up ChromeDriver
+        uses: nanasess/setup-chromedriver@v2
+
+      # Verify browser versions (handy for debugging)
+      - name: Show Chrome & ChromeDriver versions
+        run: |
+          google-chrome --version || true
+          chromedriver --version || true
+
+      # If tests rely on a display, run them with Xvfb
+      - name: Run Tests (Maven)
+        env:
+          # Common flags you can toggle via repo secrets if needed
+          HEADLESS: "true"
+        run: |
+          # Many Selenium frameworks look for headless via system property;
+          # adapt the -D flags to your framework if needed.
+          xvfb-run -a mvn -B -e -Dtest.headless=${HEADLESS} -DskipTests=false clean test
+
+      # Always collect Maven surefire/failsafe reports
+      - name: Upload Test Reports (Surefire/Failsafe)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maven-test-reports
+          path: |
+            **/target/surefire-reports/**
+            **/target/failsafe-reports/**
+          if-no-files-found: ignore
+          retention-days: 7
+
+      # If you generate Allure results (e.g., into target/allure-results), upload them too
+      - name: Upload Allure Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results
+          path: |
+            **/target/allure-results/**
+            allure-results/**
+          if-no-files-found: ignore
+          retention-days: 7
