@@ -1,36 +1,72 @@
-# This is a basic workflow to help you get started with Actions
+name: CI - Java Selenium Tests
 
-name: CI
-
-# Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events but only for the "main" branch
   push:
-    branches: [ "master" ]
+    branches: [ master ]
   pull_request:
-    branches: [ "master" ]
+    branches: [ master ]
 
-  # Allows you to run this workflow manually from the Actions tab
-  workflow_dispatch:
-
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
-  build:
-    # The type of runner that the job will run on
+  tests:
     runs-on: ubuntu-latest
 
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      # Runs a single command using the runners shell
-      - name: Run a one-line script
-        run: echo Hello, world!
+      # Set up Java and enable Maven dependency caching
+      - name: Set up Temurin JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
 
-      # Runs a set of commands using the runners shell
-      - name: Run a multi-line script
+      # Install Google Chrome (stable)
+      - name: Set up Chrome
+        uses: browser-actions/setup-chrome@v1
+
+      # OPTIONAL: If your framework still needs an explicit ChromeDriver.
+      # If you're on Selenium 4.6+ you can remove this step (Selenium Manager handles drivers).
+      - name: Set up ChromeDriver
+        uses: nanasess/setup-chromedriver@v2
+
+      # Verify browser versions (handy for debugging)
+      - name: Show Chrome & ChromeDriver versions
         run: |
-          echo Add other actions to build,
-          echo test, and deploy your project.
+          google-chrome --version || true
+          chromedriver --version || true
+
+      # If tests rely on a display, run them with Xvfb
+      - name: Run Tests (Maven)
+        env:
+          # Common flags you can toggle via repo secrets if needed
+          HEADLESS: "true"
+        run: |
+          # Many Selenium frameworks look for headless via system property;
+          # adapt the -D flags to your framework if needed.
+          xvfb-run -a mvn -B -e -Dtest.headless=${HEADLESS} -DskipTests=false clean test
+
+      # Always collect Maven surefire/failsafe reports
+      - name: Upload Test Reports (Surefire/Failsafe)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maven-test-reports
+          path: |
+            **/target/surefire-reports/**
+            **/target/failsafe-reports/**
+          if-no-files-found: ignore
+          retention-days: 7
+
+      # If you generate Allure results (e.g., into target/allure-results), upload them too
+      - name: Upload Allure Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results
+          path: |
+            **/target/allure-results/**
+            allure-results/**
+          if-no-files-found: ignore
+          retention-days: 7
